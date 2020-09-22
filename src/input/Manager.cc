@@ -1339,7 +1339,7 @@ void Manager::EndCurrentSend(ReaderFrontend* reader)
 		}
 
 	assert(i->stream_type == TABLE_STREAM);
-	TableStream* stream = (TableStream*) i;
+	auto* stream = static_cast<TableStream*>(i);
 
 	// lastdict contains all deleted entries and should be empty apart from that
 	IterCookie *c = stream->lastDict->InitForIteration();
@@ -1394,11 +1394,11 @@ void Manager::EndCurrentSend(ReaderFrontend* reader)
 		stream->tab->Remove(*ih->idxkey);
 		stream->lastDict->Remove(lastDictIdxKey); // delete in next line
 		delete lastDictIdxKey;
-		delete(ih);
+		delete ih;
 		}
 
-	stream->lastDict->Clear(); // should be empt. buti- well... who knows...
-	delete(stream->lastDict);
+	stream->lastDict->Clear(); // should be empty. but well... who knows...
+	delete stream->lastDict;
 
 	stream->lastDict = stream->currDict;
 	stream->currDict = new PDict<InputHash>;

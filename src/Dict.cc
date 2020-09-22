@@ -25,7 +25,7 @@
 
 namespace zeek {
 
-class IterCookie {
+class [[deprecated("Remove in v5.1. Use the standard-library-compatible version of iteration.")]] IterCookie {
 public:
 	IterCookie(Dictionary* d) : d(d) {}
 
@@ -185,6 +185,8 @@ TEST_CASE("dict iteration")
 	dict.Insert(key, &val);
 	dict.Insert(key2, &val2);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	detail::HashKey* it_key;
 	IterCookie* it = dict.InitForIteration();
 	CHECK(it != nullptr);
@@ -192,30 +194,258 @@ TEST_CASE("dict iteration")
 
 	while ( uint32_t* entry = dict.NextEntry(it_key, it) )
 		{
-		if ( count == 0 )
+		switch ( count )
 			{
-			// The DictEntry constructor typecasts this down to a uint32_t, so
-			// we can't just check the value directly.
-			// Explanation: hash_t is 64bit, open-dict only uses 32bit hash to
-			// save space for each item (24 bytes aligned). OpenDict has table
-			// size of 2^N and only take the lower bits of the hash. (The
-			// original hash takes transformation in FibHash() to map into a
-			// smaller 2^N range).
-			CHECK(it_key->Hash() == (uint32_t)key2->Hash());
-			CHECK(*entry == 10);
-			}
-		else
-			{
-			CHECK(it_key->Hash() == (uint32_t)key->Hash());
-			CHECK(*entry == 15);
+			case 0:
+				// The DictEntry constructor typecasts this down to a uint32_t, so
+				// we can't just check the value directly.
+				// Explanation: hash_t is 64bit, open-dict only uses 32bit hash to
+				// save space for each item (24 bytes aligned). OpenDict has table
+				// size of 2^N and only take the lower bits of the hash. (The
+				// original hash takes transformation in FibHash() to map into a
+				// smaller 2^N range).
+				CHECK(it_key->Hash() == (uint32_t)key2->Hash());
+				CHECK(*entry == 10);
+				break;
+			case 1:
+				CHECK(it_key->Hash() == (uint32_t)key->Hash());
+				CHECK(*entry == 15);
+				break;
+			default:
+				break;
 			}
 		count++;
 
 		delete it_key;
 		}
 
+	CHECK(count == 2);
+
+#pragma GCC diagnostic pop
+
 	delete key;
 	delete key2;
+	}
+
+TEST_CASE("dict new iteration")
+	{
+	PDict<uint32_t> dict;
+
+	uint32_t val = 15;
+	uint32_t key_val = 5;
+	detail::HashKey* key = new detail::HashKey(key_val);
+
+	uint32_t val2 = 10;
+	uint32_t key_val2 = 25;
+	detail::HashKey* key2 = new detail::HashKey(key_val2);
+
+	dict.Insert(key, &val);
+	dict.Insert(key2, &val2);
+
+	int count = 0;
+
+	for ( const auto& entry : dict )
+		{
+		auto* v = static_cast<uint32_t*>(entry.value);
+		uint64_t k = *(uint32_t*) entry.GetKey();
+
+		switch ( count )
+			{
+			case 0:
+				CHECK(k == key_val2);
+				CHECK(*v == val2);
+				break;
+			case 1:
+				CHECK(k == key_val);
+				CHECK(*v == val);
+				break;
+			default:
+				break;
+			}
+
+		count++;
+		}
+
+	CHECK(count == 2);
+
+	delete key;
+	delete key2;
+	}
+
+TEST_CASE("dict robust iteration")
+	{
+	PDict<uint32_t> dict;
+
+	uint32_t val = 15;
+	uint32_t key_val = 5;
+	detail::HashKey* key = new detail::HashKey(key_val);
+
+	uint32_t val2 = 10;
+	uint32_t key_val2 = 25;
+	detail::HashKey* key2 = new detail::HashKey(key_val2);
+
+	uint32_t val3 = 20;
+	uint32_t key_val3 = 35;
+	detail::HashKey* key3 = new detail::HashKey(key_val3);
+
+	dict.Insert(key, &val);
+	dict.Insert(key2, &val2);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+	detail::HashKey* it_key;
+	IterCookie* it = dict.InitForIteration();
+	CHECK(it != nullptr);
+	dict.MakeRobustCookie(it);
+
+	int count = 0;
+
+	while ( uint32_t* entry = dict.NextEntry(it_key, it) )
+		{
+		switch ( count )
+			{
+			case 0:
+				CHECK(it_key->Hash() == (uint32_t)key2->Hash());
+				CHECK(*entry == 10);
+				dict.Insert(key3, &val3);
+				break;
+			case 1:
+				CHECK(it_key->Hash() == (uint32_t)key->Hash());
+				CHECK(*entry == 15);
+				break;
+			case 2:
+				CHECK(it_key->Hash() == (uint32_t)key3->Hash());
+				CHECK(*entry == 20);
+				break;
+			default:
+				// We shouldn't get here.
+				CHECK(false);
+				break;
+			}
+		count++;
+		}
+
+	CHECK(count == 3);
+
+	IterCookie* it2 = dict.InitForIteration();
+	CHECK(it2 != nullptr);
+ 	dict.MakeRobustCookie(it2);
+
+	count = 0;
+	while ( uint32_t* entry = dict.NextEntry(it_key, it2) )
+		{
+		switch ( count )
+			{
+			case 0:
+				CHECK(it_key->Hash() == (uint32_t)key2->Hash());
+				CHECK(*entry == 10);
+				dict.Remove(key3);
+				break;
+			case 1:
+				CHECK(it_key->Hash() == (uint32_t)key->Hash());
+				CHECK(*entry == 15);
+				break;
+			default:
+				// We shouldn't get here.
+				CHECK(false);
+				break;
+			}
+		count++;
+		}
+
+	CHECK(count == 2);
+
+#pragma GCC diagnostic pop
+
+	delete key;
+	delete key2;
+	delete key3;
+	}
+
+TEST_CASE("dict new robust iteration")
+	{
+	PDict<uint32_t> dict;
+
+	uint32_t val = 15;
+	uint32_t key_val = 5;
+	detail::HashKey* key = new detail::HashKey(key_val);
+
+	uint32_t val2 = 10;
+	uint32_t key_val2 = 25;
+	detail::HashKey* key2 = new detail::HashKey(key_val2);
+
+	uint32_t val3 = 20;
+	uint32_t key_val3 = 35;
+	detail::HashKey* key3 = new detail::HashKey(key_val3);
+
+	dict.Insert(key, &val);
+	dict.Insert(key2, &val2);
+
+	int count = 0;
+
+	auto it = dict.begin_robust();
+	for ( ; it != dict.end_robust(); ++it )
+		{
+		auto* v = static_cast<uint32_t*>((*it).value);
+		uint64_t k = *(uint32_t*) (*it).GetKey();
+
+		switch ( count )
+			{
+			case 0:
+				CHECK(k == key_val2);
+				CHECK(*v == val2);
+				dict.Insert(key3, &val3);
+				break;
+			case 1:
+				CHECK(k == key_val);
+				CHECK(*v == val);
+				break;
+			case 2:
+				CHECK(k == key_val3);
+				CHECK(*v == val3);
+				break;
+			default:
+				// We shouldn't get here.
+				CHECK(false);
+				break;
+			}
+		count++;
+		}
+
+	CHECK(count == 3);
+	count = 0;
+
+	auto it2 = dict.begin_robust();
+	for ( ; it2 != dict.end_robust(); ++it2 )
+		{
+		auto* v = static_cast<uint32_t*>((*it2).value);
+		uint64_t k = *(uint32_t*) (*it2).GetKey();
+
+		switch ( count )
+			{
+			case 0:
+				CHECK(k == key_val2);
+				CHECK(*v == val2);
+				dict.Insert(key3, &val3);
+				dict.Remove(key3);
+				break;
+			case 1:
+				CHECK(k == key_val);
+				CHECK(*v == val);
+				break;
+			default:
+				// We shouldn't get here.
+				CHECK(false);
+				break;
+			}
+		count++;
+		}
+
+	CHECK(count == 2);
+
+	delete key;
+	delete key2;
+	delete key3;
 	}
 
 TEST_SUITE_END();
@@ -345,7 +575,7 @@ int Dictionary::OffsetInClusterByPosition(int position) const
 	return position - head;
 	}
 
-// Find the next valid entry after the position. Positiion can be -1, which means
+// Find the next valid entry after the position. Position can be -1, which means
 // look for the next valid entry point altogether.
 int Dictionary::Next(int position) const
 	{
@@ -543,7 +773,7 @@ void Dictionary::Dump(int level) const
 		}
 	}
 
-//////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 //Initialization.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 Dictionary::Dictionary(DictOrder ordering, int initial_size)
@@ -590,6 +820,11 @@ void Dictionary::Clear()
 		{
 		delete cookies;
 		cookies = nullptr;
+		}
+	if ( iterators )
+		{
+		delete iterators;
+		iterators = nullptr;
 		}
 	log2_buckets = 0;
 	num_iterators = 0;
@@ -717,14 +952,14 @@ int Dictionary::LookupIndex(const void* key, int key_size, detail::hash_t hash, 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Insert
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void* Dictionary::Insert(void* key, int key_size, detail::hash_t hash, void* val, bool copy_key)
 	{
 	ASSERT_VALID(this);
 
 	// Allow insertions only if there's no active non-robust iterations.
-	ASSERT(num_iterators == 0 || (cookies && cookies->size() == num_iterators));
+	ASSERT(num_iterators == 0 || (cookies && cookies->size() == num_iterators) || (iterators && iterators->size() == num_iterators));
 
 	// Initialize the table if it hasn't been done yet. This saves memory storing a bunch
 	// of empty dicts.
@@ -756,6 +991,15 @@ void* Dictionary::Insert(void* key, int key_size, detail::hash_t hash, void* val
 				{
 				ASSERT_VALID(c);
 				//ASSERT(false);
+				auto it = std::find(c->inserted->begin(), c->inserted->end(), table[position]);
+				if ( it != c->inserted->end() )
+					it->value = val;
+				}
+
+		if ( iterators && ! iterators->empty() )
+			//need to set new v for iterators too.
+			for ( auto c: *iterators )
+				{
 				auto it = std::find(c->inserted->begin(), c->inserted->end(), table[position]);
 				if ( it != c->inserted->end() )
 					it->value = val;
@@ -804,6 +1048,12 @@ void Dictionary::InsertRelocateAndAdjust(detail::DictEntry& entry, int insert_po
 
 	if ( cookies && ! cookies->empty() )
 		for ( auto c: *cookies )
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+			AdjustOnInsert(c, entry, insert_position, last_affected_position);
+#pragma GCC diagnostic pop
+	if ( iterators && ! iterators->empty() )
+		for ( auto c: *iterators )
 			AdjustOnInsert(c, entry, insert_position, last_affected_position);
 	}
 
@@ -841,11 +1091,28 @@ void Dictionary::InsertAndRelocate(detail::DictEntry& entry, int insert_position
 		}
 	}
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 /// Adjust Cookies on Insert.
 void Dictionary::AdjustOnInsert(IterCookie* c, const detail::DictEntry& entry, int insert_position, int last_affected_position)
 	{
 	ASSERT(c);
 	ASSERT_VALID(c);
+	if ( insert_position < c->next )
+		c->inserted->push_back(entry);
+	if ( insert_position < c->next && c->next <= last_affected_position )
+		{
+		int k = TailOfClusterByPosition(c->next);
+		ASSERT(k >= 0 && k < Capacity());
+		c->visited->push_back(table[k]);
+		}
+	}
+
+#pragma GCC diagnostic pop
+
+void Dictionary::AdjustOnInsert(RobustDictIterator* c, const detail::DictEntry& entry, int insert_position, int last_affected_position)
+	{
 	if ( insert_position < c->next )
 		c->inserted->push_back(entry);
 	if ( insert_position < c->next && c->next <= last_affected_position )
@@ -878,12 +1145,12 @@ void Dictionary::SizeUp()
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Remove
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void* Dictionary::Remove(const void* key, int key_size, detail::hash_t hash, bool dont_delete)
 	{//cookie adjustment: maintain inserts here. maintain next in lower level version.
 	ASSERT_VALID(this);
-	ASSERT(num_iterators == 0 || (cookies && cookies->size() == num_iterators)); //only robust iterators exist.
+	ASSERT(num_iterators == 0 || (cookies && cookies->size() == num_iterators) || (iterators && iterators->size() == num_iterators)); //only robust iterators exist.
 	ASSERT(! dont_delete); //this is a poorly designed flag. if on, the internal has nowhere to return and memory is lost.
 
 	int position = LookupIndex(key, key_size, hash);
@@ -916,6 +1183,13 @@ detail::DictEntry Dictionary::RemoveRelocateAndAdjust(int position)
 
 	if ( cookies && ! cookies->empty() )
 		for ( auto c: *cookies )
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+			AdjustOnRemove(c, entry, position, last_affected_position);
+#pragma GCC diagnostic pop
+
+	if ( iterators && ! iterators->empty() )
+		for ( auto c: *iterators )
 			AdjustOnRemove(c, entry, position, last_affected_position);
 
 	return entry;
@@ -946,9 +1220,30 @@ detail::DictEntry Dictionary::RemoveAndRelocate(int position, int* last_affected
 	return entry;
 	}
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 void Dictionary::AdjustOnRemove(IterCookie* c, const detail::DictEntry& entry, int position, int last_affected_position)
 	{
 	ASSERT_VALID(c);
+	c->inserted->erase(std::remove(c->inserted->begin(), c->inserted->end(), entry), c->inserted->end());
+	if ( position < c->next && c->next <= last_affected_position )
+		{
+		int moved = HeadOfClusterByPosition(c->next-1);
+		if ( moved < position )
+			moved = position;
+		c->inserted->push_back(table[moved]);
+		}
+
+	//if not already the end of the dictionary, adjust next to a valid one.
+	if ( c->next < Capacity() && table[c->next].Empty() )
+		c->next = Next(c->next);
+	}
+
+#pragma GCC diagnostic pop
+
+void Dictionary::AdjustOnRemove(RobustDictIterator* c, const detail::DictEntry& entry, int position, int last_affected_position)
+	{
 	c->inserted->erase(std::remove(c->inserted->begin(), c->inserted->end(), entry), c->inserted->end());
 	if ( position < c->next && c->next <= last_affected_position )
 		{
@@ -974,7 +1269,7 @@ void Dictionary::Remap()
 	///remap from bottom up.
 	///remap creates two parts of the dict: [0,remap_end] (remap_end, ...]. the former is mixed with old/new entries; the latter contains all new entries.
 	///
-	if ( num_iterators )
+	if ( num_iterators > 0 )
 		return;
 
 	int left = detail::DICT_REMAP_ENTRIES;
@@ -993,7 +1288,7 @@ bool Dictionary::Remap(int position, int* new_position)
 	{
 	ASSERT_VALID(this);
 	///Remap changes item positions by remove() and insert(). to avoid excessive operation. avoid it when safe iteration is in progress.
-	ASSERT(! cookies || cookies->empty());
+	ASSERT( ( ! cookies || cookies->empty() ) && ( ! iterators || iterators->empty() ) );
 	int current = BucketByPosition(position);//current bucket
 	int expected = BucketByHash(table[position].hash, log2_buckets); //expected bucket in new table.
 	//equal because 1: it's a new item, 2: it's an old item, but new bucket is the same as old. 50% of old items act this way due to fibhash.
@@ -1014,10 +1309,6 @@ bool Dictionary::Remap(int position, int* new_position)
 	return true;
 	}
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Iteration
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void* Dictionary::NthEntry(int n, const void*& key, int& key_size) const
 	{
 	if ( ! order || n < 0 || n >= Length() )
@@ -1027,6 +1318,13 @@ void* Dictionary::NthEntry(int n, const void*& key, int& key_size) const
 	key_size = entry.key_size;
 	return entry.value;
 	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Iteration
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 void Dictionary::MakeRobustCookie(IterCookie* cookie)
 	{ //make sure c->next >= 0.
@@ -1144,6 +1442,218 @@ void Dictionary::StopIteration(IterCookie* cookie) const
 	{
 	Dictionary* dp = const_cast<Dictionary*>(this);
 	dp->StopIterationNonConst(cookie);
+	}
+
+#pragma GCC diagnostic pop
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// New Iteration
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DictIterator::DictIterator(const Dictionary* d, detail::DictEntry* begin, detail::DictEntry* end)
+	: curr(begin), end(end)
+	{
+	// Make sure that we're starting on a non-empty element.
+	while ( curr != end && curr->Empty() )
+		++curr;
+
+	// Cast away the constness so that the number of iterators can be modified in the dictionary. This does
+	// violate the constness guarantees of const-begin()/end() and cbegin()/cend(), but we're not modifying the
+	// actual data in the collection, just a counter in the wrapper of the collection.
+	dict = const_cast<Dictionary*>(d);
+	dict->num_iterators++;
+	}
+
+DictIterator::~DictIterator()
+	{
+	if ( dict->num_iterators > 0 )
+		dict->num_iterators--;
+	}
+
+DictIterator& DictIterator::operator++()
+	{
+	// The non-robust case is easy. Just advanced the current position forward until you find
+	// one isn't empty and isn't the end.
+	do {
+		++curr;
+		}
+	while ( curr != end && curr->Empty() );
+
+	return *this;
+	}
+
+
+
+
+RobustDictIterator Dictionary::MakeRobustIterator()
+	{
+	if ( ! iterators )
+		iterators = new std::vector<RobustDictIterator*>;
+
+	num_iterators++;
+	return { this };
+	}
+
+detail::DictEntry Dictionary::GetNextRobustIteration(RobustDictIterator* iter)
+	{
+	// If there are any inserted entries, return them first.
+	// That keeps the list small and helps avoiding searching
+	// a large list when deleting an entry.
+	if ( ! table )
+		{
+		if ( num_iterators > 0 )
+			num_iterators--;
+		iter->Complete();
+		return detail::DictEntry(nullptr); // end of iteration
+		}
+
+	if ( iter->inserted && ! iter->inserted->empty() )
+		{
+		// Return the last one. Order doesn't matter,
+		// and removing from the tail is cheaper.
+		detail::DictEntry e = iter->inserted->back();
+		iter->inserted->pop_back();
+		return e;
+		}
+
+	if ( iter->next < 0 )
+		iter->next = Next(-1);
+
+	// if resize happens during iteration. before sizeup, iter->next points to Capacity(),
+	// but now Capacity() doubles up and iter->next doesn't point to the end anymore.
+	// this is fine because iter->next may be filled now.
+	// however, iter->next can also be empty.
+	// before sizeup, we use iter->next >= Capacity() to indicate the end of the iteration.
+	// now this guard is invalid, we may face iter->next is valid but empty now.F
+	//fix it here.
+	int capacity = Capacity();
+	if ( iter->next < capacity && table[iter->next].Empty() )
+		{
+		ASSERT(false); //stop to check the condition here. why it's happening.
+		iter->next = Next(iter->next);
+		}
+
+	//filter out visited keys.
+	if ( iter->visited && ! iter->visited->empty() )
+		//filter out visited entries.
+		while ( iter->next < capacity )
+			{
+			ASSERT(! table[iter->next].Empty());
+			auto it = std::find(iter->visited->begin(), iter->visited->end(), table[iter->next]);
+			if ( it == iter->visited->end() )
+				break;
+			iter->visited->erase(it);
+			iter->next = Next(iter->next);
+			}
+
+	if ( iter->next >= capacity )
+		{//end.
+		if ( num_iterators > 0 )
+			num_iterators--;
+		iter->Complete();
+		return detail::DictEntry(nullptr); // end of iteration
+		}
+
+	ASSERT(! table[iter->next].Empty());
+	detail::DictEntry e = table[iter->next];
+
+	//prepare for next time.
+	iter->next = Next(iter->next);
+	return e;
+	}
+
+RobustDictIterator::RobustDictIterator(Dictionary* d) : curr(nullptr), dict(d)
+	{
+	// Don't do any of this stuff for end iterators.
+	if ( dict )
+		{
+		next = -1;
+		inserted = new std::vector<detail::DictEntry>();
+		visited = new std::vector<detail::DictEntry>();
+
+		dict->iterators->push_back(this);
+		curr = dict->GetNextRobustIteration(this);
+		}
+	}
+
+RobustDictIterator::RobustDictIterator(const RobustDictIterator& that) : curr(that.curr)
+	{
+	*this = that;
+	}
+
+RobustDictIterator::RobustDictIterator(RobustDictIterator&& that) : curr(that.curr)
+	{
+	*this = that;
+	}
+
+RobustDictIterator::~RobustDictIterator()
+	{
+	Complete();
+	}
+
+void RobustDictIterator::Complete()
+	{
+	if ( dict )
+		{
+		if ( dict->num_iterators > 0 )
+			dict->num_iterators--;
+
+		dict->iterators->erase(std::remove(dict->iterators->begin(), dict->iterators->end(), this),
+		                       dict->iterators->end());
+
+		delete inserted;
+		delete visited;
+
+		inserted = nullptr;
+		visited = nullptr;
+		dict = nullptr;
+		}
+	}
+
+RobustDictIterator& RobustDictIterator::operator++()
+	{
+	curr = dict->GetNextRobustIteration(this);
+	return *this;
+	}
+
+RobustDictIterator& RobustDictIterator::operator=(const RobustDictIterator& that)
+	{
+	if ( that.dict )
+		{
+		dict = that.dict;
+		inserted = new std::vector<detail::DictEntry>(*that.inserted);
+		visited = new std::vector<detail::DictEntry>(*that.visited);
+		curr = that.curr;
+		next = that.next;
+
+		dict->num_iterators++;
+		dict->iterators->push_back(this);
+		}
+
+	return *this;
+	}
+
+RobustDictIterator& RobustDictIterator::operator=(RobustDictIterator&& that)
+	{
+	if ( that.dict )
+		{
+		dict = that.dict;
+		curr = std::move(that.curr);
+		next = that.next;
+
+		inserted = new std::vector<detail::DictEntry>(*that.inserted);
+		delete that.inserted;
+		visited = new std::vector<detail::DictEntry>(*that.visited);
+		delete that.visited;
+
+		dict->iterators->push_back(this);
+		dict->iterators->erase(std::remove(dict->iterators->begin(), dict->iterators->end(), &that),
+		                       dict->iterators->end());
+
+		that.dict = nullptr;
+		}
+
+	return *this;
 	}
 
 } // namespace zeek
