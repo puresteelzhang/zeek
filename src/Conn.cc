@@ -121,10 +121,20 @@ Connection::Connection(NetSessions* s, const detail::ConnIDKey& k, double t,
 	++total_connections;
 
 	if ( arg_encap )
-		encapsulation = new EncapsulationStack(*arg_encap);
+		encapsulation = std::make_unique<EncapsulationStack>(*arg_encap);
 	else
 		encapsulation = nullptr;
 	}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+Connection::Connection(NetSessions* s, const detail::ConnIDKey& k, double t,
+                       const ConnID* id, uint32_t flow, const Packet* pkt)
+	: Connection(s, k, t, id, flow, pkt, pkt->encap.get())
+	{
+	}
+#pragma GCC diagnostic pop
+
 
 Connection::~Connection()
 	{
@@ -137,12 +147,11 @@ Connection::~Connection()
 		conn_val->SetOrigin(nullptr);
 
 	delete root_analyzer;
-	delete encapsulation;
 
 	--current_connections;
 	}
 
-void Connection::CheckEncapsulation(const EncapsulationStack* arg_encap)
+void Connection::CheckEncapsulation(const std::shared_ptr<EncapsulationStack>& arg_encap)
 	{
 	if ( encapsulation && arg_encap )
 		{
@@ -152,8 +161,7 @@ void Connection::CheckEncapsulation(const EncapsulationStack* arg_encap)
 				EnqueueEvent(tunnel_changed, nullptr, ConnVal(),
 				             arg_encap->ToVal());
 
-			delete encapsulation;
-			encapsulation = new EncapsulationStack(*arg_encap);
+			encapsulation = std::make_shared<EncapsulationStack>(*arg_encap);
 			}
 		}
 
@@ -165,7 +173,6 @@ void Connection::CheckEncapsulation(const EncapsulationStack* arg_encap)
 			EnqueueEvent(tunnel_changed, nullptr, ConnVal(), empty.ToVal());
 			}
 
-		delete encapsulation;
 		encapsulation = nullptr;
 		}
 
@@ -174,7 +181,7 @@ void Connection::CheckEncapsulation(const EncapsulationStack* arg_encap)
 		if ( tunnel_changed )
 			EnqueueEvent(tunnel_changed, nullptr, ConnVal(), arg_encap->ToVal());
 
-		encapsulation = new EncapsulationStack(*arg_encap);
+		encapsulation = std::make_shared<EncapsulationStack>(*arg_encap);
 		}
 	}
 
