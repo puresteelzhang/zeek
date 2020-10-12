@@ -421,14 +421,19 @@ double check_pseudo_time(const Packet* pkt)
 	return current_pseudo;
 	}
 
+iosource::PktSrc* get_current_pktsrc()
+	{
+	return dynamic_cast<iosource::PktSrc*>(current_iosrc);
+	}
+
 } // namespace detail
 
-extern double current_packet_timestamp()
+double current_packet_timestamp()
 	{
 	return detail::current_pseudo;
 	}
 
-extern double current_packet_wallclock()
+double current_packet_wallclock()
 	{
 	// We stop time when we are suspended.
 	if ( run_state::is_processing_suspended() )
