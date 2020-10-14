@@ -7,6 +7,7 @@
 #include "Timer.h"
 #include "Notifier.h"
 #include "net_util.h"
+#include "Dict.h"
 
 #include <vector>
 #include <list>
@@ -26,13 +27,10 @@
 #define ICMP_PORT_MASK	0x30000
 
 namespace zeek {
-template<typename T> class PDict;
 class String;
 }
-template<typename T> using PDict [[deprecated("Remove in v4.1. Use zeek::PDict instead.")]] = zeek::PDict<T>;
 using BroString [[deprecated("Remove in v4.1. Use zeek::String instead.")]] = zeek::String;
 
-ZEEK_FORWARD_DECLARE_NAMESPACED(IterCookie, zeek);
 ZEEK_FORWARD_DECLARE_NAMESPACED(Frame, zeek::detail);
 ZEEK_FORWARD_DECLARE_NAMESPACED(Func, zeek);
 ZEEK_FORWARD_DECLARE_NAMESPACED(IPAddr, zeek);
@@ -1093,7 +1091,7 @@ protected:
 	detail::ExprPtr expire_time;
 	detail::ExprPtr expire_func;
 	TableValTimer* timer;
-	IterCookie* expire_cookie;
+	RobustDictIterator expire_iterator;
 	detail::PrefixTable* subnets;
 	ValPtr def_val;
 	detail::ExprPtr change_func;

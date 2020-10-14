@@ -87,23 +87,18 @@ public:
 	 */
 	void DrainModifications();
 
-	/**
-	 * Prepare the analyzer set to be iterated over.
-	 * @see Dictionary#InitForIteration
-	 * @return an iterator that may be used to loop over analyzers in the set.
-	 */
-	IterCookie* InitForIteration() const
-		{ return analyzer_map.InitForIteration(); }
+	// Iterator support
+	using iterator = zeek::DictIterator;
+	using const_iterator = const iterator;
+	using reverse_iterator = std::reverse_iterator<iterator>;
+	using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-	/**
-	 * Get next entry in the analyzer set.
-	 * @see Dictionary#NextEntry
-	 * @param c a set iterator.
-	 * @return the next analyzer in the set or a null pointer if there is no
-	 *         more left (in that case the cookie is also deleted).
-	 */
-	file_analysis::Analyzer* NextEntry(IterCookie* c)
-		{ return analyzer_map.NextEntry(c); }
+	iterator begin() { return analyzer_map.begin(); }
+	iterator end() { return analyzer_map.end(); }
+	const_iterator begin() const { return analyzer_map.begin(); }
+	const_iterator end() const { return analyzer_map.end(); }
+	const_iterator cbegin() { return analyzer_map.cbegin(); }
+	const_iterator cend() { return analyzer_map.cend(); }
 
 protected:
 

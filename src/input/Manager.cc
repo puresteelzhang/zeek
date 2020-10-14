@@ -273,12 +273,12 @@ bool Manager::CreateStream(Stream* info, RecordVal* description)
 
 		{
 		// create config mapping in ReaderInfo. Has to be done before the construction of reader_obj.
-		zeek::detail::HashKey* k;
-		IterCookie* c = info->config->AsTable()->InitForIteration();
-
-		TableEntryVal* v;
-		while ( (v = info->config->AsTable()->NextEntry(k, c)) )
+		auto* info_config_table = info->config->AsTable();
+		for ( const auto& icte : *info_config_table )
 			{
+			detail::HashKey* k = icte.GetHashKey();
+			auto* v = icte.GetValue<TableEntryVal*>();
+
 			auto index = info->config->RecreateIndex(*k);
 			string key = index->Idx(0)->AsString()->CheckString();
 			string value = v->GetVal()->AsString()->CheckString();
@@ -1342,13 +1342,11 @@ void Manager::EndCurrentSend(ReaderFrontend* reader)
 	auto* stream = static_cast<TableStream*>(i);
 
 	// lastdict contains all deleted entries and should be empty apart from that
-	IterCookie *c = stream->lastDict->InitForIteration();
-	stream->lastDict->MakeRobustCookie(c);
-	InputHash* ih;
-	zeek::detail::HashKey *lastDictIdxKey;
-
-	while ( ( ih = stream->lastDict->NextEntry(lastDictIdxKey, c) ) )
+	for ( auto it = stream->lastDict->begin_robust(); it != stream->lastDict->end_robust(); ++it )
 		{
+		zeek::detail::HashKey *lastDictIdxKey = it->GetHashKey();
+		InputHash* ih = it->GetValue<InputHash*>();
+
 		ValPtr val;
 		ValPtr predidx;
 		EnumValPtr ev;

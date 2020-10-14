@@ -210,7 +210,6 @@ char* CompositeHash::SingleValHash(bool type_check, char* kp0,
 			kp1 = reinterpret_cast<char*>(kp+1);
 
 			auto tbl = tv->AsTable();
-			auto it = tbl->InitForIteration();
 			auto lv = make_intrusive<ListVal>(TYPE_ANY);
 
 			struct HashKeyComparer {
@@ -227,11 +226,11 @@ char* CompositeHash::SingleValHash(bool type_check, char* kp0,
 			};
 
 			std::map<HashKey*, int, HashKeyComparer> hashkeys;
-			HashKey* k;
 			auto idx = 0;
 
-			while ( tbl->NextEntry(k, it) )
+			for ( const auto& entry : *tbl )
 				{
+				HashKey* k = entry.GetHashKey();
 				hashkeys[k] = idx++;
 				lv->Append(tv->RecreateIndex(*k));
 				}

@@ -38,12 +38,11 @@ void Analyzer::Initialize()
 
 	auto mapping_val = mapping_id->GetVal()->AsTableVal();
 	auto mapping_tbl = mapping_val->AsTable();
-	auto c = mapping_tbl->InitForIteration();
 
-	zeek::detail::HashKey* k = nullptr;
-	TableEntryVal* v;
-	while ( (v = mapping_tbl->NextEntry(k, c)) )
+	for ( const auto& mve : *mapping_tbl )
 		{
+		zeek::detail::HashKey* k = mve.GetHashKey();
+		auto* v = mve.GetValue<TableEntryVal*>();
 		auto key = mapping_val->RecreateIndex(*k);
 		delete k;
 
