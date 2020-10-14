@@ -247,14 +247,14 @@ public:
 	BifEnum::Tunnel::Type tunnel_type = BifEnum::Tunnel::IP;
 
 	/**
-	 * If the packet contains a GRE tunnel, this fieidl will contain the
+	 * If the packet contains a GRE tunnel, this field will contain the
 	 * GRE version. It is used to pass this information from the GRE
 	 * analyzer to the IPTunnel analyzer.
 	 */
 	int gre_version = -1;
 
 	/**
-	 * If the packet contains a GRE tunnel, this fieidl will contain the
+	 * If the packet contains a GRE tunnel, this field will contain the
 	 * GRE link type. It is used to pass this information from the GRE
 	 * analyzer to the IPTunnel analyzer.
 	 */

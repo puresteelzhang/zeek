@@ -421,7 +421,7 @@ double check_pseudo_time(const Packet* pkt)
 	return current_pseudo;
 	}
 
-iosource::PktSrc* get_current_pktsrc()
+iosource::PktSrc* current_packet_source()
 	{
 	return dynamic_cast<iosource::PktSrc*>(current_iosrc);
 	}

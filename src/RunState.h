@@ -32,7 +32,7 @@ extern void zeek_terminate_loop(const char* reason);
  * Returns the packet source for the packet currently being processed. This will
  * return null if some other iosrc is currently active.
  */
-extern zeek::iosource::PktSrc* get_current_pktsrc();
+extern zeek::iosource::PktSrc* current_packet_source();
 
 extern double check_pseudo_time(const Packet *pkt);
 
