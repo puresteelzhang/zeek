@@ -268,7 +268,10 @@ void NetSessions::DoNextPacket(double t, const Packet* pkt, const IP_Hdr* ip_hdr
 	if ( packet_filter && packet_filter->Match(ip_hdr, len, caplen) )
 		 return;
 
-	if ( ! pkt->l2_checksummed && ! zeek::detail::ignore_checksums && ip4 &&
+	if ( ! pkt->l2_checksummed && 
+	     ! zeek::detail::ignore_checksums && 
+	     ip4 &&
+	     ! zeek::id::find_val<TableVal>("ignore_checksums_nets")->Contains(ip_hdr->IPHeaderSrcAddr()) && 
 	     detail::in_cksum(reinterpret_cast<const uint8_t*>(ip4), ip_hdr_len) != 0xffff )
 		{
 		Weird("bad_IP_checksum", pkt, encapsulation);
